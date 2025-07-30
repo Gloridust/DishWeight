@@ -23,8 +23,8 @@ a = Analysis(
     pathex=[current_dir],  # 搜索路径
     binaries=[],
     datas=[
-        ('dish_data_sample.json', '.'),  # 包含示例数据文件
         ('README.md', '.'),  # 包含说明文档
+        ('USAGE.md', '.'),   # 包含用户使用说明
     ],
     hiddenimports=[
         'tkinter',
