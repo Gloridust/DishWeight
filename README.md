@@ -16,6 +16,7 @@
 - tkinter (通常随Python安装)
 - pandas
 - openpyxl
+- cx_Freeze (仅打包时需要)
 
 ## 安装步骤
 
