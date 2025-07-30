@@ -107,24 +107,16 @@ python main.py
 
 ## 打包为可执行文件
 
-### macOS/Windows 一键打包
+### 一键打包命令
 ```bash
 # 安装打包工具
-pip install pyinstaller
+pip install cx_Freeze
 
-# macOS 推荐命令（避免.app bundle问题）
-pyinstaller --onedir --windowed --name="DishWeight" --exclude-module=PyQt5 --exclude-module=PySide6 main.py
-
-# Windows 命令
-pyinstaller --onefile --windowed --name="DishWeight" --exclude-module=PyQt5 --exclude-module=PySide6 main.py
+# 执行打包
+python setup_cxfreeze.py build
 ```
 
-**注意**：
-- macOS 使用 `--onedir` 模式以避免安全限制
-- Windows 可以使用 `--onefile` 模式生成单个可执行文件
-- `--exclude-module` 参数排除不需要的Qt库，避免冲突
-
-打包完成后，可执行文件位于 `dist/` 目录中。
+打包完成后，可执行文件位于 `build_cxfreeze/` 目录中。
 
 ## 导出功能
 
