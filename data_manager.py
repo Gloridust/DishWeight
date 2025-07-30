@@ -226,7 +226,7 @@ class DataManager:
         return total_ingredients
     
     def export_to_excel(self, filename: str):
-        """导出数据到Excel"""
+        """导出所有数据到Excel"""
         try:
             with pd.ExcelWriter(filename, engine='openpyxl') as writer:
                 # 导出食材表
@@ -236,7 +236,7 @@ class DataManager:
                         "ID": ing_id,
                         "食材名称": ing_info["name"],
                         "单位": ing_info["unit"],
-                        "单价": ing_info["price"]
+                        "单价": f"{ing_info['price']:.2f}"
                     })
                 
                 if ingredients_data:
@@ -251,12 +251,15 @@ class DataManager:
                         if ing_id in self.data["ingredients"]:
                             ing_name = self.data["ingredients"][ing_id]["name"]
                             unit = self.data["ingredients"][ing_id]["unit"]
+                            price = self.data["ingredients"][ing_id]["price"]
                             dishes_data.append({
                                 "菜品ID": dish_id,
                                 "菜品名称": dish_name,
                                 "食材名称": ing_name,
-                                "用量": amount,
-                                "单位": unit
+                                "用量": f"{amount:.2f}",
+                                "单位": unit,
+                                "单价": f"{price:.2f}",
+                                "小计": f"{amount * price:.2f}"
                             })
                 
                 if dishes_data:
@@ -284,4 +287,93 @@ class DataManager:
             return True
         except Exception as e:
             print(f"导出Excel失败: {e}")
+            return False
+    
+    def export_menu_statistics(self, menu_id: str, menu_name: str, filename: str):
+        """导出指定宴席的食材统计到Excel"""
+        try:
+            # 计算食材用量
+            total_ingredients = self.calculate_ingredients_for_menu(menu_id)
+            
+            if not total_ingredients:
+                print("没有找到宴席数据或食材数据")
+                return False
+            
+            # 准备统计数据
+            statistics_data = []
+            total_cost = 0
+            
+            for ing_id, amount in total_ingredients.items():
+                if ing_id in self.data["ingredients"]:
+                    ing_info = self.data["ingredients"][ing_id]
+                    cost = amount * ing_info["price"]
+                    total_cost += cost
+                    
+                    statistics_data.append({
+                        "食材名称": ing_info["name"],
+                        "需要数量": f"{amount:.2f}",
+                        "单位": ing_info["unit"],
+                        "单价": f"{ing_info['price']:.2f}",
+                        "总价": f"{cost:.2f}"
+                    })
+            
+            # 按食材名称排序
+            statistics_data.sort(key=lambda x: x["食材名称"])
+            
+            # 添加合计行
+            statistics_data.append({
+                "食材名称": "合计",
+                "需要数量": "",
+                "单位": "",
+                "单价": "",
+                "总价": f"{total_cost:.2f}"
+            })
+            
+            with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                # 宴席食材统计表
+                df_statistics = pd.DataFrame(statistics_data)
+                df_statistics.to_excel(writer, sheet_name="食材统计", index=False)
+                
+                # 宴席详细信息表
+                menu_info = self.data["menus"].get(menu_id, {})
+                menu_details = []
+                
+                if menu_info:
+                    for dish_id, quantity in menu_info["dishes"].items():
+                        if dish_id in self.data["dishes"]:
+                            dish_info = self.data["dishes"][dish_id]
+                            dish_cost = 0
+                            
+                            # 计算单个菜品成本
+                            for ing_id, ing_amount in dish_info["ingredients"].items():
+                                if ing_id in self.data["ingredients"]:
+                                    ing_price = self.data["ingredients"][ing_id]["price"]
+                                    dish_cost += ing_amount * ing_price
+                            
+                            menu_details.append({
+                                "菜品名称": dish_info["name"],
+                                "份数": quantity,
+                                "单份成本": f"{dish_cost:.2f}",
+                                "总成本": f"{dish_cost * quantity:.2f}"
+                            })
+                
+                if menu_details:
+                    df_menu_details = pd.DataFrame(menu_details)
+                    df_menu_details.to_excel(writer, sheet_name="菜品明细", index=False)
+                
+                # 创建汇总信息表
+                summary_data = [
+                    {"项目": "宴席名称", "值": menu_name},
+                    {"项目": "菜品种类", "值": len(menu_info.get("dishes", {}))},
+                    {"项目": "食材种类", "值": len(total_ingredients)},
+                    {"项目": "食材总成本", "值": f"{total_cost:.2f}元"},
+                    {"项目": "统计时间", "值": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                ]
+                
+                df_summary = pd.DataFrame(summary_data)
+                df_summary.to_excel(writer, sheet_name="汇总信息", index=False)
+            
+            return True
+        except Exception as e:
+            print(f"导出宴席统计失败: {e}")
             return False

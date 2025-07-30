@@ -181,3 +181,5 @@ cython_debug/
 .cursorindexingignore
 
 *.json
+build_cxfreeze/
+.DS_Store

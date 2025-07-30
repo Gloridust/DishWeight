@@ -243,7 +243,8 @@ class DishWeightGUI:
         self.analysis_menu_combo.pack(side=tk.LEFT, padx=5)
         
         ttk.Button(select_frame, text="计算食材用量", command=self.calculate_ingredients).pack(side=tk.LEFT, padx=5)
-        ttk.Button(select_frame, text="导出Excel", command=self.export_excel).pack(side=tk.LEFT, padx=5)
+        ttk.Button(select_frame, text="导出全部数据", command=self.export_excel).pack(side=tk.LEFT, padx=5)
+        ttk.Button(select_frame, text="导出食材统计", command=self.export_menu_statistics).pack(side=tk.LEFT, padx=5)
         
         # 数据管理框架
         data_mgmt_frame = ttk.LabelFrame(analysis_frame, text="数据管理")
@@ -709,26 +710,79 @@ class DishWeightGUI:
                     ing_info["name"], 
                     f"{amount:.2f}", 
                     ing_info["unit"], 
-                    f"{ing_info['price']:.2f}", 
-                    f"{cost:.2f}"
+                    f"¥{ing_info['price']:.2f}", 
+                    f"¥{cost:.2f}"
                 ))
         
-        # 添加总计行
+        # 添加总计行 - 使用不同的标签来突出显示
         self.result_tree.insert("", tk.END, values=(
-            "总计", "", "", "", f"{total_cost:.2f}"
-        ))
+            "==== 总计 ====", "", "", "", f"¥{total_cost:.2f}"
+        ), tags=('total',))
+        
+        # 配置总计行样式
+        self.result_tree.tag_configure('total', background='lightblue', font=('Arial', 10, 'bold'))
     
     def export_excel(self):
-        """导出Excel"""
+        """导出所有数据到Excel"""
+        from datetime import datetime
+        
+        # 自动生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"宴席管理数据_{timestamp}.xlsx"
+        
         filename = filedialog.asksaveasfilename(
+            initialfile=default_filename,
             defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+            filetypes=[("Excel files", "*.xlsx")],
             title="保存Excel文件"
         )
         
         if filename:
+            # 确保文件名以.xlsx结尾
+            if not filename.lower().endswith('.xlsx'):
+                filename += '.xlsx'
+                
             if self.data_manager.export_to_excel(filename):
                 messagebox.showinfo("成功", f"数据已导出到 {filename}")
+            else:
+                messagebox.showerror("错误", "导出失败")
+    
+    def export_menu_statistics(self):
+        """导出当前宴席的食材统计到Excel"""
+        menu_text = self.analysis_menu_var.get().strip()
+        if not menu_text:
+            messagebox.showerror("错误", "请先选择宴席并计算食材用量")
+            return
+        
+        # 解析宴席ID和名称
+        if "(" in menu_text and ")" in menu_text:
+            menu_id = menu_text.split("(")[-1].split(")")[0]
+            menu_name = menu_text.split("(")[0].strip()
+        else:
+            messagebox.showerror("错误", "请选择有效的宴席")
+            return
+        
+        from datetime import datetime
+        
+        # 自动生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_menu_name = "".join(c for c in menu_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        default_filename = f"宴席食材统计_{safe_menu_name}_{timestamp}.xlsx"
+        
+        filename = filedialog.asksaveasfilename(
+            initialfile=default_filename,
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")],
+            title="保存宴席食材统计"
+        )
+        
+        if filename:
+            # 确保文件名以.xlsx结尾
+            if not filename.lower().endswith('.xlsx'):
+                filename += '.xlsx'
+                
+            if self.data_manager.export_menu_statistics(menu_id, menu_name, filename):
+                messagebox.showinfo("成功", f"宴席食材统计已导出到 {filename}")
             else:
                 messagebox.showerror("错误", "导出失败")
     
