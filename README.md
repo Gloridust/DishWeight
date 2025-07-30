@@ -12,7 +12,7 @@
 
 ## 安装要求
 
-- Python 3.7+
+- Python 3.10+ (推荐 Python 3.10 以确保最佳兼容性)
 - tkinter (通常随Python安装)
 - pandas
 - openpyxl
@@ -105,52 +105,26 @@ python main.py
 - **版本管理**: 支持数据格式版本升级
 - **路径自适应**: 自动适配脚本和EXE运行环境
 
-## EXE打包
+## 打包为可执行文件
 
-### 自动打包
-使用提供的自动打包脚本：
+### macOS/Windows 一键打包
 ```bash
-python build_exe.py
+# 安装打包工具
+pip install pyinstaller
+
+# macOS 推荐命令（避免.app bundle问题）
+pyinstaller --onedir --windowed --name="DishWeight" --exclude-module=PyQt5 --exclude-module=PySide6 main.py
+
+# Windows 命令
+pyinstaller --onefile --windowed --name="DishWeight" --exclude-module=PyQt5 --exclude-module=PySide6 main.py
 ```
 
-### 手动打包
-1. 安装PyInstaller：
-   ```bash
-   pip install pyinstaller
-   ```
+**注意**：
+- macOS 使用 `--onedir` 模式以避免安全限制
+- Windows 可以使用 `--onefile` 模式生成单个可执行文件
+- `--exclude-module` 参数排除不需要的Qt库，避免冲突
 
-2. 使用配置文件打包：
-   ```bash
-   pyinstaller build_exe.spec
-   ```
-
-3. 或使用命令行打包：
-   ```bash
-   pyinstaller --onedir --windowed --name="DishWeight" main.py
-   ```
-
-### 打包后的文件结构
-```
-dist/DishWeight/
-├── DishWeight.exe          # 主程序
-├── dish_data_sample.json   # 示例数据
-├── README.md              # 说明文档
-├── 使用说明.txt            # 使用说明
-└── _internal/             # 依赖文件
-```
-
-### EXE版本特性
-- **数据文件**: 自动创建在EXE同目录下
-- **路径处理**: 自动适配EXE运行环境
-- **权限检查**: 自动检查目录写入权限
-- **单文件存储**: 简化的数据管理方式
-- **错误处理**: 增强的错误处理和用户提示
-
-### 部署说明
-1. 将整个 `dist/DishWeight/` 目录复制到目标机器
-2. 确保目标目录有写入权限
-3. 双击 `DishWeight.exe` 启动程序
-4. 首次运行会自动创建 `dish_data.json` 数据文件
+打包完成后，可执行文件位于 `dist/` 目录中。
 
 ## 导出功能
 
