@@ -102,9 +102,17 @@ class DishWeightGUI:
         left_frame = ttk.LabelFrame(dishes_frame, text="菜品列表")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 菜品列表
-        self.dishes_listbox = tk.Listbox(left_frame, height=20)
-        self.dishes_listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 菜品列表（带滚动条）
+        listbox_frame = ttk.Frame(left_frame)
+        listbox_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.dishes_listbox = tk.Listbox(listbox_frame, height=20)
+        dishes_scrollbar = ttk.Scrollbar(listbox_frame, orient=tk.VERTICAL, command=self.dishes_listbox.yview)
+        self.dishes_listbox.configure(yscrollcommand=dishes_scrollbar.set)
+        
+        self.dishes_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        dishes_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
         self.dishes_listbox.bind("<<ListboxSelect>>", self.on_dish_select)
         
         # 菜品操作按钮
@@ -140,6 +148,10 @@ class DishWeightGUI:
         self.dish_ingredient_combo = ttk.Combobox(ingredient_input_frame, textvariable=self.dish_ingredient_var, width=15)
         self.dish_ingredient_combo.grid(row=0, column=1, padx=2, pady=2)
         
+        # 绑定输入事件以支持模糊搜索
+        self.dish_ingredient_combo.bind('<KeyRelease>', self.on_ingredient_search)
+        self.dish_ingredient_combo.bind('<Button-1>', self.on_ingredient_combo_click)
+        
         # 用量输入
         ttk.Label(ingredient_input_frame, text="用量:").grid(row=0, column=2, padx=2, pady=2)
         self.dish_amount_var = tk.StringVar()
@@ -171,8 +183,17 @@ class DishWeightGUI:
         left_frame = ttk.LabelFrame(menus_frame, text="宴席列表")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        self.menus_listbox = tk.Listbox(left_frame, height=20)
-        self.menus_listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 宴席列表（带滚动条）
+        menu_listbox_frame = ttk.Frame(left_frame)
+        menu_listbox_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.menus_listbox = tk.Listbox(menu_listbox_frame, height=20)
+        menu_scrollbar = ttk.Scrollbar(menu_listbox_frame, orient=tk.VERTICAL, command=self.menus_listbox.yview)
+        self.menus_listbox.configure(yscrollcommand=menu_scrollbar.set)
+        
+        self.menus_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        menu_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
         self.menus_listbox.bind("<<ListboxSelect>>", self.on_menu_select)
         
         # 宴席操作按钮
@@ -194,6 +215,15 @@ class DishWeightGUI:
         ttk.Label(name_frame, text="宴席名称:").pack(side=tk.LEFT)
         self.menu_name_var = tk.StringVar()
         ttk.Entry(name_frame, textvariable=self.menu_name_var, width=30).pack(side=tk.LEFT, padx=5)
+        
+        # 餐桌数量
+        table_frame = ttk.Frame(right_frame)
+        table_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(table_frame, text="餐桌数量:").pack(side=tk.LEFT)
+        self.menu_table_count_var = tk.StringVar(value="1")
+        ttk.Entry(table_frame, textvariable=self.menu_table_count_var, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Label(table_frame, text="桌").pack(side=tk.LEFT)
         
         # 菜品添加框架
         dish_input_frame = ttk.Frame(right_frame)
@@ -243,7 +273,6 @@ class DishWeightGUI:
         self.analysis_menu_combo.pack(side=tk.LEFT, padx=5)
         
         ttk.Button(select_frame, text="计算食材用量", command=self.calculate_ingredients).pack(side=tk.LEFT, padx=5)
-        ttk.Button(select_frame, text="导出全部数据", command=self.export_excel).pack(side=tk.LEFT, padx=5)
         ttk.Button(select_frame, text="导出食材统计", command=self.export_menu_statistics).pack(side=tk.LEFT, padx=5)
         
         # 数据管理框架
@@ -383,9 +412,44 @@ class DishWeightGUI:
     def update_ingredient_combos(self):
         """更新食材下拉框"""
         ingredients = self.data_manager.get_ingredients()
-        ingredient_names = [f"{ing_info['name']} ({ing_id})" for ing_id, ing_info in ingredients.items()]
+        # 存储食材名称到ID的映射
+        self.ingredient_name_to_id = {}
+        ingredient_names = []
         
+        for ing_id, ing_info in ingredients.items():
+            name = ing_info['name']
+            display_name = f"{name} ({ing_id})"
+            ingredient_names.append(display_name)
+            # 同时支持纯名称和带ID的格式查找
+            self.ingredient_name_to_id[name] = ing_id
+            self.ingredient_name_to_id[display_name] = ing_id
+        
+        self.all_ingredient_names = ingredient_names
         self.dish_ingredient_combo['values'] = ingredient_names
+    
+    def on_ingredient_search(self, event):
+        """食材搜索事件处理"""
+        search_text = self.dish_ingredient_var.get().lower()
+        if not hasattr(self, 'all_ingredient_names'):
+            return
+        
+        if search_text == "":
+            # 如果搜索框为空，显示所有食材
+            self.dish_ingredient_combo['values'] = self.all_ingredient_names
+        else:
+            # 模糊搜索匹配
+            filtered_names = [name for name in self.all_ingredient_names 
+                            if search_text in name.lower()]
+            self.dish_ingredient_combo['values'] = filtered_names
+        
+        # 保持下拉框打开状态
+        self.dish_ingredient_combo.event_generate('<Button-1>')
+    
+    def on_ingredient_combo_click(self, event):
+        """食材下拉框点击事件"""
+        # 点击时显示所有食材
+        if hasattr(self, 'all_ingredient_names'):
+            self.dish_ingredient_combo['values'] = self.all_ingredient_names
     
     # 菜品管理相关方法
     def new_dish(self):
@@ -444,10 +508,24 @@ class DishWeightGUI:
             messagebox.showerror("错误", "用量必须是数字")
             return
         
-        # 解析食材ID
-        if "(" in ingredient_text and ")" in ingredient_text:
+        # 解析食材ID - 支持多种输入方式
+        ingredient_id = None
+        
+        # 首先检查是否在映射表中
+        if hasattr(self, 'ingredient_name_to_id') and ingredient_text in self.ingredient_name_to_id:
+            ingredient_id = self.ingredient_name_to_id[ingredient_text]
+        # 如果不在映射表中，尝试传统的解析方式
+        elif "(" in ingredient_text and ")" in ingredient_text:
             ingredient_id = ingredient_text.split("(")[-1].split(")")[0]
+        # 如果都不匹配，尝试按纯名称查找
         else:
+            ingredients = self.data_manager.get_ingredients()
+            for ing_id, ing_info in ingredients.items():
+                if ing_info['name'].lower() == ingredient_text.lower():
+                    ingredient_id = ing_id
+                    break
+        
+        if not ingredient_id:
             messagebox.showerror("错误", "请选择有效的食材")
             return
         
@@ -536,12 +614,15 @@ class DishWeightGUI:
         """新建宴席"""
         self.selected_menu_id = None
         self.menu_name_var.set("")
+        self.menu_table_count_var.set("1")
         self.current_menu_dishes = {}
         self.refresh_menu_dishes_tree()
     
     def save_menu(self):
         """保存宴席"""
         name = self.menu_name_var.get().strip()
+        table_count_str = self.menu_table_count_var.get().strip()
+        
         if not name:
             messagebox.showerror("错误", "请填写宴席名称")
             return
@@ -550,17 +631,21 @@ class DishWeightGUI:
             messagebox.showerror("错误", "请至少添加一道菜品")
             return
         
+        try:
+            table_count = int(table_count_str) if table_count_str else 1
+            if table_count <= 0:
+                raise ValueError()
+        except ValueError:
+            messagebox.showerror("错误", "餐桌数量必须是正整数")
+            return
+        
         if self.selected_menu_id:
             # 更新现有宴席
-            self.data_manager.data["menus"][self.selected_menu_id] = {
-                "name": name,
-                "dishes": self.current_menu_dishes
-            }
-            self.data_manager.save_data()
+            self.data_manager.update_menu(self.selected_menu_id, name, self.current_menu_dishes, table_count)
             messagebox.showinfo("成功", "宴席更新成功")
         else:
             # 添加新宴席
-            self.data_manager.add_menu(name, self.current_menu_dishes)
+            self.data_manager.add_menu(name, self.current_menu_dishes, table_count)
             messagebox.showinfo("成功", "宴席添加成功")
         
         self.refresh_menus()
@@ -645,6 +730,9 @@ class DishWeightGUI:
                     menu_info = menus[self.selected_menu_id]
                     self.menu_name_var.set(menu_info["name"])
                     self.current_menu_dishes = menu_info["dishes"].copy()
+                    # 加载餐桌数量，如果没有则默认为1
+                    table_count = menu_info.get("table_count", 1)
+                    self.menu_table_count_var.set(str(table_count))
                     self.refresh_menu_dishes_tree()
     
     def refresh_menus(self):
@@ -721,31 +809,6 @@ class DishWeightGUI:
         
         # 配置总计行样式
         self.result_tree.tag_configure('total', background='lightblue', font=('Arial', 10, 'bold'))
-    
-    def export_excel(self):
-        """导出所有数据到Excel"""
-        from datetime import datetime
-        
-        # 自动生成文件名
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_filename = f"宴席管理数据_{timestamp}.xlsx"
-        
-        filename = filedialog.asksaveasfilename(
-            initialfile=default_filename,
-            defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx")],
-            title="保存Excel文件"
-        )
-        
-        if filename:
-            # 确保文件名以.xlsx结尾
-            if not filename.lower().endswith('.xlsx'):
-                filename += '.xlsx'
-                
-            if self.data_manager.export_to_excel(filename):
-                messagebox.showinfo("成功", f"数据已导出到 {filename}")
-            else:
-                messagebox.showerror("错误", "导出失败")
     
     def export_menu_statistics(self):
         """导出当前宴席的食材统计到Excel"""

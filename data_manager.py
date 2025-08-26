@@ -192,12 +192,13 @@ class DataManager:
             self.save_data()
     
     # 宴席菜单管理
-    def add_menu(self, name: str, dishes: Dict[str, int]) -> str:
+    def add_menu(self, name: str, dishes: Dict[str, int], table_count: int = 1) -> str:
         """添加宴席菜单"""
         menu_id = str(len(self.data["menus"]) + 1)
         self.data["menus"][menu_id] = {
             "name": name,
-            "dishes": dishes
+            "dishes": dishes,
+            "table_count": table_count
         }
         self.save_data()
         return menu_id
@@ -205,6 +206,22 @@ class DataManager:
     def get_menus(self) -> Dict:
         """获取所有宴席菜单"""
         return self.data["menus"]
+    
+    def update_menu(self, menu_id: str, name: str, dishes: Dict[str, int], table_count: int = 1):
+        """更新宴席菜单"""
+        if menu_id in self.data["menus"]:
+            self.data["menus"][menu_id] = {
+                "name": name,
+                "dishes": dishes,
+                "table_count": table_count
+            }
+            self.save_data()
+    
+    def delete_menu(self, menu_id: str):
+        """删除宴席菜单"""
+        if menu_id in self.data["menus"]:
+            del self.data["menus"][menu_id]
+            self.save_data()
     
     def calculate_ingredients_for_menu(self, menu_id: str) -> Dict[str, float]:
         """计算宴席所需食材总量"""
@@ -214,14 +231,19 @@ class DataManager:
         menu = self.data["menus"][menu_id]
         total_ingredients = {}
         
+        # 获取餐桌数量，向后兼容旧数据
+        table_count = menu.get("table_count", 1)
+        
         for dish_id, quantity in menu["dishes"].items():
             if dish_id in self.data["dishes"]:
                 dish = self.data["dishes"][dish_id]
                 for ingredient_id, amount in dish["ingredients"].items():
+                    # 计算总用量时考虑餐桌数量
+                    total_amount = amount * quantity * table_count
                     if ingredient_id in total_ingredients:
-                        total_ingredients[ingredient_id] += amount * quantity
+                        total_ingredients[ingredient_id] += total_amount
                     else:
-                        total_ingredients[ingredient_id] = amount * quantity
+                        total_ingredients[ingredient_id] = total_amount
         
         return total_ingredients
     
@@ -312,22 +334,18 @@ class DataManager:
                     statistics_data.append({
                         "食材名称": ing_info["name"],
                         "需要数量": f"{amount:.2f}",
-                        "单位": ing_info["unit"],
-                        "单价": f"{ing_info['price']:.2f}",
-                        "总价": f"{cost:.2f}"
+                        "单位": ing_info["unit"]
                     })
             
             # 按食材名称排序
             statistics_data.sort(key=lambda x: x["食材名称"])
             
-            # 添加合计行
-            statistics_data.append({
-                "食材名称": "合计",
-                "需要数量": "",
-                "单位": "",
-                "单价": "",
-                "总价": f"{total_cost:.2f}"
-            })
+            # 添加序号
+            for i, item in enumerate(statistics_data, 1):
+                item["序号"] = i
+            
+            # 重新排列列顺序
+            statistics_data = [{"序号": item["序号"], "食材名称": item["食材名称"], "需要数量": item["需要数量"], "单位": item["单位"]} for item in statistics_data]
             
             with pd.ExcelWriter(filename, engine='openpyxl') as writer:
                 # 宴席食材统计表
@@ -342,31 +360,30 @@ class DataManager:
                     for dish_id, quantity in menu_info["dishes"].items():
                         if dish_id in self.data["dishes"]:
                             dish_info = self.data["dishes"][dish_id]
-                            dish_cost = 0
-                            
-                            # 计算单个菜品成本
-                            for ing_id, ing_amount in dish_info["ingredients"].items():
-                                if ing_id in self.data["ingredients"]:
-                                    ing_price = self.data["ingredients"][ing_id]["price"]
-                                    dish_cost += ing_amount * ing_price
                             
                             menu_details.append({
                                 "菜品名称": dish_info["name"],
-                                "份数": quantity,
-                                "单份成本": f"{dish_cost:.2f}",
-                                "总成本": f"{dish_cost * quantity:.2f}"
+                                "份数": quantity
                             })
+                    
+                    # 添加序号
+                    for i, item in enumerate(menu_details, 1):
+                        item["序号"] = i
+                    
+                    # 重新排列列顺序
+                    menu_details = [{"序号": item["序号"], "菜品名称": item["菜品名称"], "份数": item["份数"]} for item in menu_details]
                 
                 if menu_details:
                     df_menu_details = pd.DataFrame(menu_details)
                     df_menu_details.to_excel(writer, sheet_name="菜品明细", index=False)
                 
                 # 创建汇总信息表
+                table_count = menu_info.get("table_count", 1)
                 summary_data = [
                     {"项目": "宴席名称", "值": menu_name},
+                    {"项目": "餐桌数量", "值": table_count},
                     {"项目": "菜品种类", "值": len(menu_info.get("dishes", {}))},
                     {"项目": "食材种类", "值": len(total_ingredients)},
-                    {"项目": "食材总成本", "值": f"{total_cost:.2f}元"},
                     {"项目": "统计时间", "值": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
                 ]
                 
