@@ -157,9 +157,18 @@ class DataManager:
     
     def delete_ingredient(self, ingredient_id: str):
         """删除食材"""
-        if ingredient_id in self.data["ingredients"]:
-            del self.data["ingredients"][ingredient_id]
-            self.save_data()
+        if ingredient_id not in self.data["ingredients"]:
+            return False
+        
+        # 检查是否有菜品使用了这个食材
+        for dish_id, dish_info in self.data["dishes"].items():
+            if ingredient_id in dish_info["ingredients"]:
+                return False
+        
+        # 删除食材
+        del self.data["ingredients"][ingredient_id]
+        self.save_data()
+        return True
     
     # 菜品管理
     def add_dish(self, name: str, ingredients: Dict[str, float]) -> str:

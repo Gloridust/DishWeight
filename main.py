@@ -373,11 +373,38 @@ class DishWeightGUI:
             messagebox.showerror("错误", "请先选择要删除的食材")
             return
         
-        if messagebox.askyesno("确认", "确定要删除这个食材吗？"):
-            self.data_manager.delete_ingredient(self.selected_ingredient_id)
-            self.refresh_ingredients()
-            self.clear_ingredient_inputs()
-            messagebox.showinfo("成功", "食材删除成功")
+        # 获取要删除的食材信息
+        ingredients = self.data_manager.get_ingredients()
+        if self.selected_ingredient_id not in ingredients:
+            messagebox.showerror("错误", "选择的食材不存在")
+            return
+        
+        ingredient_name = ingredients[self.selected_ingredient_id]["name"]
+        
+        if messagebox.askyesno("确认", f"确定要删除食材 '{ingredient_name}' 吗？\n\n注意：如果有菜品正在使用此食材，将无法删除。"):
+            # 尝试删除食材
+            success = self.data_manager.delete_ingredient(self.selected_ingredient_id)
+            
+            if success:
+                self.refresh_ingredients()
+                self.clear_ingredient_inputs()
+                messagebox.showinfo("成功", f"食材 '{ingredient_name}' 删除成功")
+            else:
+                # 检查具体失败原因
+                used_in_dishes = []
+                dishes = self.data_manager.get_dishes()
+                for dish_id, dish_info in dishes.items():
+                    if self.selected_ingredient_id in dish_info["ingredients"]:
+                        used_in_dishes.append(dish_info["name"])
+                
+                if used_in_dishes:
+                    messagebox.showerror("删除失败", 
+                                       f"无法删除食材 '{ingredient_name}'\n\n" +
+                                       f"该食材正被以下菜品使用：\n" +
+                                       "\n".join([f"• {dish}" for dish in used_in_dishes]) +
+                                       "\n\n请先从相关菜品中移除此食材，然后再尝试删除。")
+                else:
+                    messagebox.showerror("删除失败", f"删除食材 '{ingredient_name}' 时发生未知错误")
     
     def on_ingredient_select(self, event):
         """食材选择事件"""
@@ -385,7 +412,9 @@ class DishWeightGUI:
         if selection:
             item = self.ingredients_tree.item(selection[0])
             values = item['values']
-            self.selected_ingredient_id = values[0]
+            
+            # 确保ID是字符串类型
+            self.selected_ingredient_id = str(values[0])
             
             # 填充输入框
             self.ingredient_name_var.set(values[1])
