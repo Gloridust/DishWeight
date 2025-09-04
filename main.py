@@ -151,6 +151,7 @@ class DishWeightGUI:
         # 绑定输入事件以支持模糊搜索
         self.dish_ingredient_combo.bind('<KeyRelease>', self.on_ingredient_search)
         self.dish_ingredient_combo.bind('<Button-1>', self.on_ingredient_combo_click)
+        self.dish_ingredient_combo.bind('<<ComboboxSelected>>', self.on_ingredient_selected)
         
         # 用量输入
         ttk.Label(ingredient_input_frame, text="用量:").grid(row=0, column=2, padx=2, pady=2)
@@ -233,6 +234,11 @@ class DishWeightGUI:
         self.menu_dish_var = tk.StringVar()
         self.menu_dish_combo = ttk.Combobox(dish_input_frame, textvariable=self.menu_dish_var, width=15)
         self.menu_dish_combo.grid(row=0, column=1, padx=2, pady=2)
+        
+        # 绑定菜品搜索和选择事件
+        self.menu_dish_combo.bind('<KeyRelease>', self.on_dish_search)
+        self.menu_dish_combo.bind('<Button-1>', self.on_dish_combo_click)
+        self.menu_dish_combo.bind('<<ComboboxSelected>>', self.on_dish_selected)
         
         ttk.Label(dish_input_frame, text="份数:").grid(row=0, column=2, padx=2, pady=2)
         self.menu_quantity_var = tk.StringVar()
@@ -442,14 +448,52 @@ class DishWeightGUI:
                             if search_text in name.lower()]
             self.dish_ingredient_combo['values'] = filtered_names
         
-        # 保持下拉框打开状态
-        self.dish_ingredient_combo.event_generate('<Button-1>')
+        # 触发下拉框显示过滤后的结果
+        self.dish_ingredient_combo.event_generate('<Down>')
     
     def on_ingredient_combo_click(self, event):
         """食材下拉框点击事件"""
         # 点击时显示所有食材
         if hasattr(self, 'all_ingredient_names'):
             self.dish_ingredient_combo['values'] = self.all_ingredient_names
+    
+    def on_ingredient_selected(self, event):
+        """食材选择事件处理"""
+        # 当用户从下拉列表中选择食材时，将选中的食材填充到文本框
+        selected_value = self.dish_ingredient_combo.get()
+        if selected_value:
+            self.dish_ingredient_var.set(selected_value)
+    
+    def on_dish_search(self, event):
+        """菜品搜索事件处理"""
+        search_text = self.menu_dish_var.get().lower()
+        if not hasattr(self, 'all_dish_names'):
+            return
+        
+        if search_text == "":
+            # 如果搜索框为空，显示所有菜品
+            self.menu_dish_combo['values'] = self.all_dish_names
+        else:
+            # 模糊搜索匹配
+            filtered_names = [name for name in self.all_dish_names 
+                            if search_text in name.lower()]
+            self.menu_dish_combo['values'] = filtered_names
+        
+        # 触发下拉框显示过滤后的结果
+        self.menu_dish_combo.event_generate('<Down>')
+    
+    def on_dish_combo_click(self, event):
+        """菜品下拉框点击事件"""
+        # 点击时显示所有菜品
+        if hasattr(self, 'all_dish_names'):
+            self.menu_dish_combo['values'] = self.all_dish_names
+    
+    def on_dish_selected(self, event):
+        """菜品选择事件处理"""
+        # 当用户从下拉列表中选择菜品时，将选中的菜品填充到文本框
+        selected_value = self.menu_dish_combo.get()
+        if selected_value:
+            self.menu_dish_var.set(selected_value)
     
     # 菜品管理相关方法
     def new_dish(self):
@@ -591,6 +635,8 @@ class DishWeightGUI:
         dishes = self.data_manager.get_dishes()
         dish_names = [f"{dish_info['name']} ({dish_id})" for dish_id, dish_info in dishes.items()]
         
+        # 存储所有菜品名称用于搜索
+        self.all_dish_names = dish_names
         self.menu_dish_combo['values'] = dish_names
         self.analysis_menu_combo['values'] = []  # 这里应该是宴席列表，稍后更新
     
