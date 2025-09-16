@@ -492,6 +492,14 @@ class DishWeightGUI:
         except Exception:
             pass
     
+    def _popup_ingredient_dropdown(self):
+        """安全地弹出食材下拉框"""
+        try:
+            if self.dish_ingredient_combo.winfo_exists():
+                self.dish_ingredient_combo.event_generate('<Down>')
+        except Exception:
+            pass
+    
     def on_ingredient_combo_click(self, event):
         """食材下拉框点击事件"""
         # 点击时显示所有食材
@@ -507,6 +515,10 @@ class DishWeightGUI:
     
     def on_dish_search(self, event):
         """菜品搜索事件处理"""
+        # 在中文等输入法组合输入阶段（Windows 常见为 keycode 229 / VK_PROCESSKEY）不更新/弹出，避免覆盖候选上屏
+        if hasattr(event, 'keycode') and event.keycode == 229:
+            return
+        
         search_text = self.menu_dish_var.get().lower()
         if not hasattr(self, 'all_dish_names'):
             return
@@ -520,8 +532,24 @@ class DishWeightGUI:
                             if search_text in name.lower()]
             self.menu_dish_combo['values'] = filtered_names
         
-        # 触发下拉框显示过滤后的结果
-        self.menu_dish_combo.event_generate('<Down>')
+        # 安全地在非输入法组合阶段、且内容有变更时弹出下拉，避免干扰上屏
+        try:
+            keysym = getattr(event, 'keysym', '')
+            keycode = getattr(event, 'keycode', None)
+            if keycode != 229 and search_text is not None and search_text != "":
+                # 避免方向键/功能键触发
+                if keysym not in ('Up','Down','Left','Right','Return','Escape','Tab','Shift_L','Shift_R','Control_L','Control_R','Alt_L','Alt_R'):
+                    self.root.after(60, self._popup_dish_dropdown)
+        except Exception:
+            pass
+    
+    def _popup_dish_dropdown(self):
+        """安全地弹出菜品下拉框"""
+        try:
+            if self.menu_dish_combo.winfo_exists():
+                self.menu_dish_combo.event_generate('<Down>')
+        except Exception:
+            pass
     
     def on_dish_combo_click(self, event):
         """菜品下拉框点击事件"""
